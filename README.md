@@ -159,7 +159,7 @@ Move large document streams to AWS S3 to reduce server RAM usage and support mas
 
 Asynchronous Processing Workers
 
-Shift reconciliation workloads to distributed workers (e.g., BullMQ or RabbitMQ) to maintain low API response latency during heavy processing.
+Shift reconciliation workloads to distributed workers (e.g., BullMQ or RabbitMQ) to maintain low API response latency during heavy processing
 
 
 
