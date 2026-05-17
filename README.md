@@ -1,165 +1,103 @@
-//how to setup the project
-Quick Start Guide
+# 3-Way Match Procurement System
 
-1. Environmental Setup
-Create a .env file in your root directory:
-
-PORT=3000
-MONGODB_URI=add_your_mongodb_url here 
-GEMINI_API_KEY=add_your_gemini_api_key
-
-2. Install and Run
-
-1.npm install
-2.npm run dev
-
-3. Test the api ->
-
-1.test api -> Get: http://localhost:3000/api/test
-               Response -> Hello world
-
-2.Upload service -> 
-
-  upload invoice pdf file
-  POST: http://localhost:3000/api/documents/upload  
-  documentType="invoice"
-  file="//upload the file"
-
-
-  upload po pdf file
-  POST: http://localhost:3000/api/documents/upload  
-  documentType="po"
-  file="//upload the file"
-
-
-  upload grn pdf file
-  POST: http://localhost:3000/api/documents/upload  
-  documentType="grn"
-  file="//upload the file"
-
-
-  3. Get document api
-    
-  GET: http://localhost:3000/api/documents/documentId
-
-
-  4. Match result api 
-   
-  GET: http://localhost:3000/api/match/CI4PO05788 // This is for the assignment part
-
-  GET: http://localhost:3000/api/match/poNumber
-
-
-
-
-# My Approach
-
-This project is a Node.js and Express backend system that uses Gemini 2.5 Flash to extract structured data from procurement PDFs such as:
-
-- Purchase Orders (PO)
-- Goods Receipt Notes (GRN)
-- Invoices
-
-After extracting the data, the system performs a Three-Way Match using deterministic JavaScript logic.
+A Node.js and Express backend system designed to automate the reconciliation of procurement documents. The system uses Gemini 2.5 Flash to extract structured data from PDF documents and applies deterministic JavaScript logic to perform an automated Three-Way Match.
 
 ---
 
-Architectural Approach
+## 🚀 Quick Start Guide
 
-The system separates document upload and document matching into different steps.
+### 1. Environment Setup
+Create a .env file in your root directory and populate it with your configuration:
 
-Instead of using simple OCR text extraction, Gemini AI converts PDF content directly into structured JSON data. This makes the extracted data cleaner and easier to process.
+PORT=3000
+MONGODB_URI=your_mongodb_connection_string
+GEMINI_API_KEY=your_gemini_api_key
 
-The system is also designed to handle uploads in any order.  
-For example:
+### 2. Install and Run
+# Install dependencies
+npm install
 
-- Invoice can be uploaded first
-- PO can be uploaded later
-- GRN can be uploaded anytime
+# Run the application in development mode
+npm run dev
 
-Once all required documents are available, the matching process runs automatically.
+### 3. API Documentation
 
+#### Health Check
+* URL: /api/test
+* Method: GET
+* Response: Hello world
 
-# Data Model
+#### Document Upload
+Uploads a procurement document (Invoice, Purchase Order, or Goods Receipt Note). The pipeline supports files uploaded in any order.
 
- Model for the document ->
- const DocumentSchema = new mongoose.Schema({
-   poNumber: { type: String, required: true, index: true, trim: true },
-   type: { type: String, required: true, enum: ['po', 'grn', 'invoice'] },
-   data: { type: mongoose.Schema.Types.Mixed, required: true },
-   uploadedAt: { type: Date, default: Date.now }
- });
+* URL: /api/documents/upload
+* Method: POST
+* Content-Type: multipart/form-data
+* Body Parameters:
+  * documentType: "invoice" | "po" | "grn"
+  * file: [PDF File]
 
-# Parsing flow ->
- [PDF File Stream] ──> [Multer Memory Buffer] ──> [Base64 Conversion] ──> [Gemini 2.5 Flash + JSON Schema] ──> [Structured MongoDB Save]
+#### Get Document Details
+* URL: /api/documents/:documentId
+* Method: GET
 
-# Matching Logic
+#### Get Match Results (Reconciliation)
+* URL: /api/match/:poNumber
+* Method: GET
 
-The matching process is handled using normal JavaScript logic instead of AI to ensure consistent and reliable results.
+---
 
-1. Document Verification
-Checks whether all required documents are available:
-- PO
-- GRN
-- Invoice
+## 🏗️ Architectural Approach
 
-If any document is missing, matching is not performed.
+The system decouples document uploading from the document matching process. 
 
-2. Duplicate Detection
-Checks if multiple documents of the same type are uploaded for the same `poNumber`.
+Instead of relying on basic optical character recognition (OCR) text streams, the system utilizes Gemini 2.5 Flash to parse PDF binaries directly into strictly typed JSON structures. This approach ensures highly reliable and structured data preservation before database insertion.
 
-Example:
-- Multiple POs for the same order
-- Multiple invoices for the same order
+### Order-Independent Ingestion
+Supply chain documents often arrive in non-sequential sequences (e.g., an invoice arriving before a warehouse tally). To support this, the ingestion pipeline is completely order-independent. Documents are grouped dynamically via a shared poNumber. 
 
-Such cases are flagged as duplicates.
-
-3. SKU Validation
-Compares invoice item codes with PO item codes.
-
-If an item exists in the invoice but not in the PO, it is flagged as:
-
-```txt id="t6vjlwm"
-item_missing_in_po
-
-
-# Handling Out-of-Order Uploads
-
-Supply chain documents often arrive in non-sequential order (e.g., invoices before warehouse tallies).
-To support this, the ingestion pipeline is fully order-independent — documents can be uploaded in any sequence.
-
-Documents are grouped using a shared poNumber.
-
-If only 1 or 2 required documents are present, the API returns:
+If only 1 or 2 required documents are available, the match API returns:
 {
   "status": "insufficient_documents"
 }
-The reconciliation logic automatically triggers as soon as the final missing document is uploaded.
-Key Assumptions
-Every document must contain a valid, extractable poNumber.
-itemCode values are expected to remain consistent across documents. Any mismatch is flagged as a discrepancy.
+The reconciliation logic evaluates the data status dynamically whenever the match endpoint is queried or a new document arrives.
 
-# Engineering Tradeoffs
-In-Memory Buffering vs Disk Storage
+---
 
-Using multer.memoryStorage() improves upload throughput and avoids local disk I/O overhead, trading higher short-term RAM usage for faster processing speed.
+## 📊 Ingestion Pipeline & Data Model
 
-Strict SKU Matching
+### Parsing Flow
+[PDF File Stream] ──> [Multer Memory Buffer] ──> [Base64 Conversion] ──> [Gemini 2.5 Flash + JSON Schema] ──> [Structured MongoDB Save]
 
-Matching is performed using exact SKU/item code comparison. This ensures audit-level accuracy but treats formatting inconsistencies across systems as explicit mismatches rather than resolving them silently.
+### MongoDB Schema
+const DocumentSchema = new mongoose.Schema({
+  poNumber: { type: String, required: true, index: true, trim: true },
+  type: { type: String, required: true, enum: ['po', 'grn', 'invoice'] },
+  data: { type: mongoose.Schema.Types.Mixed, required: true },
+  uploadedAt: { type: Date, default: Date.now }
+});
 
-# Future Improvements
-Semantic SKU Mapping
+---
 
-Introduce embedding-based similarity matching to automatically map mismatched vendor and internal SKU formats using item descriptions.
+## 🛠️ Matching Logic
 
-Cloud-Based File Streaming
+Reconciliation is explicitly handled via deterministic JavaScript logic rather than AI to ensure audit-level accuracy, consistency, and traceability.
 
-Move large document streams to AWS S3 to reduce server RAM usage and support massive multi-page uploads efficiently.
+1. Document Verification: Verifies the existence of all three core documents (po, grn, invoice) for a given poNumber.
+2. Duplicate Detection: Flags instances where multiple files of the same type are uploaded under the same poNumber.
+3. SKU Validation: Validates item codes across records. If an item exists on the invoice but is absent from the Purchase Order, the system flags the error code: item_missing_in_po.
 
-Asynchronous Processing Workers
+---
 
-Shift reconciliation workloads to distributed workers (e.g., BullMQ or RabbitMQ) to maintain low API response latency during heavy processing
+## 💡 Engineering Tradeoffs
 
+* In-Memory Buffering vs. Disk Storage: Utilizing multer.memoryStorage() optimizes processing throughput and eliminates local disk I/O overhead. This trades short-term RAM utilization for faster overall execution speed.
+* Strict SKU Matching: Matches are enforced through exact string comparisons on SKU/item codes. This guarantees absolute compliance but flags minor formatting variations across systems as explicit mismatches.
 
+---
 
+## 🔮 Future Improvements
+
+* Semantic SKU Mapping: Integrate vector embedding similarity matching to resolve and map distinct vendor and internal SKU string definitions based on semantic item descriptions.
+* Cloud-Based File Streaming: Transition from memory buffers to direct cloud streams (e.g., AWS S3) to significantly lower server memory overhead during large multi-page uploads.
+* Asynchronous Processing Workers: Offload the matching engine and AI parsing tasks to background workers via message brokers (e.g., BullMQ or RabbitMQ) to sustain sub-second API responsiveness during spikes in traffic.
