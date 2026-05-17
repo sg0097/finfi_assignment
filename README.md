@@ -81,8 +81,6 @@ const DocumentSchema = new mongoose.Schema({
 
 ## 🛠️ Matching Logic
 
-Reconciliation is explicitly handled via deterministic JavaScript logic rather than AI to ensure audit-level accuracy, consistency, and traceability.
-
 1. Document Verification: Verifies the existence of all three core documents (po, grn, invoice) for a given poNumber.
 2. Duplicate Detection: Flags instances where multiple files of the same type are uploaded under the same poNumber.
 3. SKU Validation: Validates item codes across records. If an item exists on the invoice but is absent from the Purchase Order, the system flags the error code: item_missing_in_po.
@@ -98,6 +96,5 @@ Reconciliation is explicitly handled via deterministic JavaScript logic rather t
 
 ## 🔮 Future Improvements
 
-* Semantic SKU Mapping: Integrate vector embedding similarity matching to resolve and map distinct vendor and internal SKU string definitions based on semantic item descriptions.
 * Cloud-Based File Streaming: Transition from memory buffers to direct cloud streams (e.g., AWS S3) to significantly lower server memory overhead during large multi-page uploads.
 * Asynchronous Processing Workers: Offload the matching engine and AI parsing tasks to background workers via message brokers (e.g., BullMQ or RabbitMQ) to sustain sub-second API responsiveness during spikes in traffic.
